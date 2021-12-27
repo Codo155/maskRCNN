@@ -18,3 +18,12 @@ figure;
 subplot(2,2,1); imshow(imrotate(frontal,-90)); title('Frontal');
 subplot(2,2,2); imshow(imrotate(satigal,-90)); title('Sagittal');
 subplot(2,2,3); imshow(imrotate(hori,-90)); title('Horizontal');
+
+
+function dice = calculate_dice(nifti1,nifti2)
+    common = (nifti1.img & nifti2.img);
+    a = sum(common(:));
+    b = sum(nifti1.img (:));
+    c = sum(nifti2.img(:));
+    dice = 2*a/(b+c);
+end 
