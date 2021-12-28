@@ -1,24 +1,12 @@
-V = niftiread('F:\OneDrive\Dokumente\FH\MasterThesis\Data\segdata\KiTS\imagesTr\case_00005.nii.gz');
-vmax = max(V,[],'all');
-vmin = min(V,[],'all');
-va_prime=(V-vmin)./(vmax-vmin);
-dim=size(va_prime);
-volshow(V);
+image = load_nii('E:\git\maskRCNN\imagesTr\case_00167.nii.gz');
+option.setviewpoint = [48 218 74];
+%view_nii(nii);
+label = load_nii('E:\git\maskRCNN\labelsTr\case_00167.nii.gz');
+option.setvalue.idx = find(label.img);
+option.setvalue.val = label.img(find(label.img));
+option.setcolorindex = 3;
 
-X= 400;
-Y= 250;
-Z= 250;
-
-frontal = va_prime(:,:,Z);
-satigal = reshape(va_prime(X,:,:),[dim(2) dim(3)]);
-hori = reshape(va_prime(:,Y,:),[dim(1) dim(3)]);
-
-
-figure;
-subplot(2,2,1); imshow(imrotate(frontal,-90)); title('Frontal');
-subplot(2,2,2); imshow(imrotate(satigal,-90)); title('Sagittal');
-subplot(2,2,3); imshow(imrotate(hori,-90)); title('Horizontal');
-
+view_nii(image,option);
 
 function dice = calculate_dice(nifti1,nifti2)
     common = (nifti1.img & nifti2.img);
