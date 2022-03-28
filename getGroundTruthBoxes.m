@@ -30,11 +30,10 @@ for z=1:352
         boxHeight= find(sumR~=0,1,'last');
         
         
+        
 
 end
 
 option.setviewpoint = [256 180 348];
 view_nii(label,option);
 
-
-% permute(label.img(256,:,:))
