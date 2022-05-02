@@ -1,11 +1,99 @@
+tic
+ctDirectory = uigetdir("",'Please select the folder with the CT images.');
+
+labelDirectory = uigetdir("",'Please select the folder with the labels.');
+
+
+rgbImagesFolder = uigetdir("",'Please select the destination folder for the RGB images');
+
+ctFiles = dir(strcat(labelDirectory,'\*.nii.gz'));
+
+counter=int16(1);
+masks={};
+for i=1:length (labelDirectory)
+    labelFile = strcat(labelDirectory,'\',ctFiles(i).name);
+    labelImage = load_nii(labelFile).img;
+    
+    
+    labelImageIndex=[];
+    
+    [xSlices,ySlices,zSlices] = size(labelImage);
+    
+    for z = 1:zSlices
+        boxes=[];
+        imageCategory={};
+        mask=[];
+        left = logical(labelImage(1:(xSlices/2),:,z)==1);
+        right = logical(labelImage((1+(xSlices/2):xSlices),:,z)==1);
+
+        %% left side
+        [xCoordinate,yCoordinate,boxWidth,boxHeight] = getCoordinates(left);
+        if boxWidth  ~= 0 && boxHeight ~= 0 
+            mask(1:(xSlices/2),:,1)=left;
+            mask((1+(xSlices/2):xSlices),:,1)=0;
+            boxes(1,:)=[xCoordinate yCoordinate boxWidth boxHeight];
+        end
+        %% right side
+        [xCoordinate,yCoordinate,boxWidth,boxHeight] = getCoordinates(right);
+        if boxWidth  ~= 0 && boxHeight ~= 0 
+            [x,y,z]=size(mask);
+            if(z==0 || x==0)
+                mask((1+(xSlices/2):xSlices),:,1)=right;
+                mask(1:(xSlices/2),:,1)=0;
+            else
+                mask(1:(xSlices/2),:,2)=0;
+                mask((1+(xSlices/2):xSlices),:,2)=right;
+            end
+            [xBoxSize,~]=size(boxes);
+            if(xBoxSize==0)
+                boxes(1,:)=  [ xCoordinate yCoordinate boxWidth boxHeight];
+            else
+                boxes(2,:)= [ xCoordinate yCoordinate boxWidth boxHeight];
+            end
+        end
+        %%
+        masks(counter,1)={logical(mask==1)};
+        %% label with bounding boxes
+        [x,~]=size(boxes);
+        if(x==1)
+            box{counter,1}=boxes;
+            imageCategory{1}='kidney';
+            box{counter,2}=imageCategory;
+            counter=counter+1;
+            labelImageIndex= [labelImageIndex,z];
+        elseif(x==2)
+            box{counter,1}=boxes;
+            imageCategory=cell(2,1);
+            imageCategory{1}='kidney';
+            imageCategory{2}='kidney';
+            box{counter,2}=imageCategory;
+            counter=counter+1;
+            labelImageIndex= [labelImageIndex,z];
+        end
+    end
+    ctFile=strcat(labelDirectory,'\',ctFiles(i).name);
+    ctImage = load_nii(ctFile).img;
+    for z=1:length(labelImageIndex)
+        img=ctImage(:,:,labelImageIndex(z));
+        rgb= cat(3,img,img,img);
+        outputBaseName=strcat(ctFiles(i).name,"_",int2str(labelImageIndex(z)),".png");
+        fullDestinationFileName = fullfile(rgbImagesFolder, outputBaseName);
+        imwrite(rgb, fullDestinationFileName);
+    end
+end
+ctds = imageDatastore(rgbImagesFolder);
+
+table = cell2table(box,'VariableNames',{'Boxes','Labels'});
+lockds= boxLabelDatastore(table);
+lables=arrayDatastore(masks,"ReadSize",1,"OutputType","same");
+ds= combine(ctds,lockds,lables);
+
+
 trainClassNames = {'kidney'};
 numClasses = length(trainClassNames);
 imageSizeTrain = [512 512 3];
-
-directory = uigetdir;
-
-ds=fileDatastore(directory,"ReadFcn",@fcn);
 net = maskrcnn("resnet50-coco",trainClassNames,InputSize=imageSizeTrain);
+
 options = trainingOptions("sgdm", ...
     InitialLearnRate=0.001, ...
     LearnRateSchedule="piecewise", ...
@@ -13,59 +101,18 @@ options = trainingOptions("sgdm", ...
     LearnRateDropFactor=0.95, ...
     Plot="none", ...
     Momentum=0.9, ...
-    MaxEpochs=10, ...
-    MiniBatchSize=2, ...
+    MaxEpochs=5, ...
+    MiniBatchSize=1, ...
     BatchNormalizationStatistics="moving", ...
     ResetInputNormalization=false, ...
     ExecutionEnvironment="gpu", ...
-    VerboseFrequency=50);
+    VerboseFrequency=10);
 
 doTraining = true;
+tic
 if doTraining
     [net,info] = trainMaskRCNN(ds,net,options,FreezeSubNetwork="backbone");
     modelDateTime = string(datetime("now",Format="yyyy-MM-dd-HH-mm-ss"));
     save("trainedMaskRCNN-"+modelDateTime+".mat","net");
 end
-
-function ds = fcn(data)
-    filename = strsplit(data,'\');
-    labelFolder= uigetdir;
-    labelPath= strcat(labelFolder,'\',char(filename{end}));
-    label =load_nii(labelPath);
-    ct=load_nii(data);
-    image=ct.img;
-    [xSize,ySize,zSize] = size(image);
-    for z = 1:zSize
-        boxes=[];
-        categorical=[];
-
-        i = squeeze(label.img(1:(xSize/2),:,z))==1;
-        mask1 = i;
-        mask1(1+(xSize/2):xSize,:)=0;
-        [xCoordinate,yCoordinate,boxWidth,boxHeight] = getCoordinates(i);
-
-        if boxWidth  ~= 0 && boxHeight ~= 0 
-            boxes=[xCoordinate yCoordinate boxWidth boxHeight];
-            categorical=['kidney'];
-        end
-
-        i = squeeze(label.img((1+(xSize/2):xSize),:,z))==1;
-        mask2(1:(xSize/2),:)=0;
-        mask2(1+(xSize/2):xSize,1:ySize)= i;
-        [xCoordinate,yCoordinate,boxWidth,boxHeight] = getCoordinates(i);
-        if boxWidth  ~= 0 && boxHeight ~= 0 
-            boxes= [boxes; xCoordinate yCoordinate boxWidth boxHeight];
-            categorical=[categorical;'kidney']
-            ds{z,2}=boxes;
-            ds{z,3}= categorical;
-        end
-        if z == 56
-            display(z)
-        end
-        masks(:,:,1)=mask1;
-        masks(:,:,2)=mask2;
-        ds{z,4}=masks;
-        ds{z,1}=image(:,:,z);
-    end
-end
-
+toc
