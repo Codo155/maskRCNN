@@ -11,16 +11,14 @@ ctFiles = dir(strcat(labelDirectory,'\*.nii.gz'));
 counter=int16(1);
 masks={};
 for i=1:length (labelDirectory)
-    try
-        labelFile = strcat(labelDirectory,'\',ctFiles(i).name);
-        labelImage = load_nii(labelFile).img;
-        
-        ctFile=strcat(labelDirectory,'\',ctFiles(i).name);
-        ctImage = load_nii(ctFile).img;
-    catch exception
-        continue;
+    try:
+    labelFile = strcat(labelDirectory,'\',ctFiles(i).name);
+    labelImage = load_nii(labelFile).img;
+    
+    ctFile=strcat(labelDirectory,'\',ctFiles(i).name);
+    ctImage = load_nii(ctFile).img;
     end
-
+    catc
 
     labelImageIndex=[];
     
