@@ -5,17 +5,18 @@ labelDirectory = uigetdir("",'Please select the folder with the labels.');
 
 
 rgbImagesFolder = uigetdir("",'Please select the destination folder for the RGB images');
+checkpointPath = uigetdir("",'Please select the destination folder for checkpoints');
 
-ctFiles = dir(strcat(labelDirectory,'\*.nii.gz'));
+ctFiles = dir(strcat(ctDirectory,'\*.nii.gz'));
 
-counter=int16(1);
+counter=int16(1);           
 masks={};
-for i=1:length (labelDirectory)
+for i=1:length (ctFiles)
     try
         labelFile = strcat(labelDirectory,'\',ctFiles(i).name);
         labelImage = load_nii(labelFile).img;
         
-        ctFile=strcat(labelDirectory,'\',ctFiles(i).name);
+        ctFile=strcat(ctDirectory,'\',ctFiles(i).name);
         ctImage = load_nii(ctFile).img;
     catch exception
         continue;
@@ -32,7 +33,7 @@ for i=1:length (labelDirectory)
         mask=[];
         left = logical(labelImage(1:(xSlices/2),:,z)==1);
         right = logical(labelImage((1+(xSlices/2):xSlices),:,z)==1);
-
+    
         %% left side
         [xCoordinate,yCoordinate,boxWidth,boxHeight] = getCoordinates(left);
         if boxWidth  ~= 0 && boxHeight ~= 0 
@@ -43,8 +44,8 @@ for i=1:length (labelDirectory)
         %% right side
         [xCoordinate,yCoordinate,boxWidth,boxHeight] = getCoordinates(right);
         if boxWidth  ~= 0 && boxHeight ~= 0 
-            [x,y,z]=size(mask);
-            if(z==0 || x==0)
+            [x,y,zMaskSize]=size(mask);
+            if(zMaskSize==0 || x==0)
                 mask((1+(xSlices/2):xSlices),:,1)=right;
                 mask(1:(xSlices/2),:,1)=0;
             else
@@ -57,7 +58,7 @@ for i=1:length (labelDirectory)
             else
                 boxes(2,:)= [ xCoordinate yCoordinate boxWidth boxHeight];
             end
-        end
+                end
         %%
         masks(counter,1)={logical(mask==1)};
         %% label with bounding boxes
@@ -104,21 +105,27 @@ options = trainingOptions("sgdm", ...
     InitialLearnRate=0.001, ...
     LearnRateSchedule="piecewise", ...
     LearnRateDropPeriod=1, ...
-    LearnRateDropFactor=0.95, ...
+    LearnRateDropFactor=0.9 , ...
     Plot="none", ...
-    Momentum=0.9, ...
-    MaxEpochs=5, ...
+    Momentum=0.5, ...
+    MaxEpochs=50, ...
     MiniBatchSize=1, ...
     BatchNormalizationStatistics="moving", ...
     ResetInputNormalization=false, ...
-    ExecutionEnvironment="cpu", ...
+    ExecutionEnvironment="gpu", ...
+    CheckpointPath=checkpointPath,...
+    CheckpointFrequency=2000,...
+    CheckpointFrequencyUnit='iteration',...
     VerboseFrequency=10);
 
+modelDateTime = string(datetime("now",Format="yyyy-MM-dd-HH-mm-ss"));
+netPath = strcat(checkpointPath,'\',"trainedMaskRCNN-"+modelDateTime+".mat");
+infoPath= strcat(checkpointPath,'\',"info-"+modelDateTime+".mat");
 doTraining = true;
 if doTraining
     [net,info] = trainMaskRCNN(ds,net,options,FreezeSubNetwork="backbone");
     modelDateTime = string(datetime("now",Format="yyyy-MM-dd-HH-mm-ss"));
-    save("trainedMaskRCNN-"+modelDateTime+".mat","net");
-    save("info-"+modelDateTime+".mat","info");
+    save(netPath,"net");
+    save(infoPath,"info");
 end
 toc
