@@ -26,6 +26,7 @@ function dice_results= validationFunction(net,labelDirectory,ctDirectory)
         for z=1:length(labelImageIndex)
             index=labelImageIndex(z);
             img=ctImage(:,:,index);
+            img=uint8(img*255);
             rgb= cat(3,img,img,img);
     
             for t=1:10
