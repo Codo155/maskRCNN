@@ -1,4 +1,6 @@
 directory = uigetdir;
+normDirectory = uigetdir("",'Please select the folder for the normalzied images.');
+
 tic
 % load files into variable files and get its count
 files = dir (strcat(directory,'\*.nii.gz'));
@@ -37,7 +39,7 @@ parfor i=1:files_count
     file = strcat(directory,'\',files(i).name);
     image = load_nii(file);
     image.img = mat2gray(image.img,[global_min,global_max]);
-    save_nii(image, strcat('E:\git\maskRCNN\norm\',files(i).name));
+    save_nii(image, strcat(normDirector',files(i).name));
 end
 
 toc
